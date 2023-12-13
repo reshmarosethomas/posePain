@@ -4,6 +4,7 @@ let brain; //initialize with ml5 object neuralNetwork
 let fileState = "modelDeployed"; //"modelDeployed" "dataCollection" "modelTraining"
 let table; //to store poseToAudio as csv
 let rows; //to store reference to poseToAudio csv rows
+let font;
 
 let pose; //regularly stores the first pose in poses
 let skeleton; //regularly stores the first skeleton in poses
@@ -12,15 +13,45 @@ let state = "waiting";
 let targetLabel;
 let poseInput; // to name poses being captured dynamically
 let poseLabel = "unknown";
+let currClip = "no clip playing";
 let poseLabelScore = 0.0;
 
 let videoScaleVal = 1;
 let isBodyVisible = true;
 let audioPlaying = false;
-let clips = [7];
+let clips = [24];
+let clipPlayed = [24];
+
+let poseNames = {
+ "p_1": "arms down",
+ "p_2": "",
+ "p_3": "",
+ "p_4": "",
+ "p_5": "",
+ "p_6": "",
+ "p_7": "",
+ "p_8": "",
+ "p_9": "",
+ "p_10": "",
+ "p_11": "",
+ "p_12": "",
+ "p_13": "",
+ "p_14": "",
+ "p_15": "",
+ "p_16": "",
+ "p_17": "",
+ "p_18": "",
+ "p_19": "",
+ "p_20": "",
+ "p_21": "",
+ "p_22": "",
+ "p_23": "",
+ "p_24": ""
+};
 
 function preload() {
     table = loadTable("poseToAudio.csv", "csv", "header");
+    font = loadFont("Lugrasimo-Regular.ttf");
 }
 
 function setup() {
@@ -34,13 +65,16 @@ function setup() {
 
     for (let r = 0; r < rows.length; r++) {
         let clipInRow = rows[r].get('clipName');
+        let indexInRow = parseInt(rows[r].get('audioId'));
         let clipPath = "audioClips/" + clipInRow;
-        clips[r] = createAudio(clipPath, () => {
-            clips[r].autoplay(false);
-            clips[r].noLoop();
-            clips[r].hideControls();
+        clips[indexInRow] = createAudio(clipPath, () => {
+            clips[indexInRow].autoplay(false);
+            clips[indexInRow].noLoop();
+            clips[indexInRow].hideControls();
           });
     }
+
+    console.log(clips);
 
     if (fileState == "dataCollection") {
         poseInput = createInput('');
@@ -135,7 +169,6 @@ function gotResult(error, results) {
 
     //console.log(results);
     //console.log(results[0].confidence);
-
     if (results[0].confidence > 0.8) {
         poseLabel = results[0].label;
         poseLabelScore = results[0].confidence;
@@ -187,6 +220,12 @@ function gotPoses(poses) {
             let target = [targetLabel];
             brain.addData(inputs, target);
         }
+    } 
+    
+    //UNSURE
+    else {
+        pose = null;
+        skeleton = null;
     }
 }
 
@@ -247,18 +286,20 @@ function draw() {
     if (poseLabel!="unsure" || poseLabel!="unclear" || poseLabel!="noPose" || poseLabel!="paused") {
         for (let r = 0; r < rows.length; r++) {
             let poseInRow = rows[r].get('poseLabel');
-            if (poseInRow == poseLabel) {
-                console.log (rows[r].get('clipName'));
+            if (poseInRow == poseLabel && !audioPlaying) {
+                //console.log (rows[r].get('clipName'));
                 let index = parseInt(rows[r].get('audioId'));
                 let clipDuration = clips[index].duration()*1000;
                 clips[index].play();
                 audioPlaying = true;
-                console.log(clipDuration);
+                //console.log(clipDuration);
+                currClip = rows[r].get('clipName');
                 setTimeout(function() { 
                     audioPlaying = false; 
-                    console.log();
+                    currClip = "no clip playing";
                 }, 
-                clipDuration);
+                clipDuration + 1000);
+                break;
             }
         }
     }
@@ -273,7 +314,13 @@ function drawVideo() {
 
     push();
     rectMode(CORNERS);
-    noFill(); stroke("red"); strokeWeight(4);
+    noFill(); stroke("#fdae61"); strokeWeight(4);
+    rect(0, 0, video.width*videoScaleVal, video.height*videoScaleVal);
+    pop();
+
+    push();
+    rectMode(CORNERS);
+    fill('rgba(6, 40, 210, 0.1)'); noStroke();
     rect(0, 0, video.width*videoScaleVal, video.height*videoScaleVal);
     pop();
 }
@@ -285,7 +332,7 @@ function drawSkeleton() {
         let a = skeleton[i][0];
         let b = skeleton[i][1];
         push();
-        stroke("black");
+        stroke("#d7191c");
         strokeWeight(2);
         line(a.position.x, a.position.y, b.position.x, b.position.y);
         pop();
@@ -295,11 +342,17 @@ function drawSkeleton() {
 function drawGUIText() {
     push();
         scale(-1, 1);
-        textSize(48); 
+        fill("#d7191c");
+        textSize(40); 
         textStyle(BOLD);
+        textFont(font);
         textAlign(CENTER, CENTER);
         //text(pose.score, -1*video.width*videoScaleVal/2, video.height*videoScaleVal/2, video.width, video.height);
-        text(poseLabel, -1*video.width*videoScaleVal/2, video.height*videoScaleVal/2, video.width, video.height-10);
-        text(poseLabelScore, -1*video.width*videoScaleVal/2, video.height*videoScaleVal/2.5, video.width, video.height-10);
-    pop();
+        if(poseLabel!="unsure" || poseLabel!="unclear" || poseLabel!="noPose" || poseLabel!="paused") {
+            let label = poseNames.poseLabel;
+        }
+        text(poseLabel, -1*video.width*videoScaleVal/2, video.height*videoScaleVal/8, video.width, video.height-10);
+        text(currClip, -1*video.width*videoScaleVal/2, video.height*videoScaleVal/1.1, video.width, video.height-10);
+        //text(poseLabelScore, -1*video.width*videoScaleVal/2, video.height*videoScaleVal/3.25, video.width, video.height-10);
+        pop();
 }
