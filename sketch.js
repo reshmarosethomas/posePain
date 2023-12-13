@@ -1,6 +1,7 @@
 let video; //stores webcam video
 let posenet; //initialize with ml5 object poseNet
 let brain; //initialize with ml5 object neuralNetwork
+let fileState = "modelDeployed"; //"modelDeployed" "dataCollection" "modelTraining"
 
 let pose; //regularly stores the first pose in poses
 let skeleton; //regularly stores the first skeleton in poses
@@ -25,6 +26,11 @@ function setup() {
     poseInput.position(1*video.width, video.height*3);
     poseInput.size(400, 32);
 
+    initializePosenet();
+    initializeBrain();
+}
+
+function initializePosenet(){
     let poseOptions = {
         architecture: 'ResNet50', //'MobileNetV1' or 'ResNet50'
         imageScaleFactor: 0.3,
@@ -41,7 +47,9 @@ function setup() {
     };
     posenet = ml5.poseNet(video, poseOptions, poseModelLoaded);
     posenet.on('pose', gotPoses);
-    
+}
+
+function initializeBrain(){
     let brainOptions = {
         inputs: 34, //17 pose skeleton points x and y = 17*2
         outputs: 24, //as many as number of poses, number of classifications
@@ -49,13 +57,17 @@ function setup() {
         debug : true,
     }
     brain = ml5.neuralNetwork(brainOptions);
-    //brain.loadData('24PoseData.json', dataReady);
-    const modelInfo = {
-        model: 'model/model.json',
-        metadata: 'model/model_meta.json',
-        weights: 'model/model.weights.bin',
-    };
-    brain.load(modelInfo, brainLoaded); 
+    
+    if (fileState == "modelTraining") {
+        brain.loadData('24PoseData.json', dataReady);
+    } else if (fileState == "modelDeployed") {
+        const modelInfo = {
+            model: 'model/model.json',
+            metadata: 'model/model_meta.json',
+            weights: 'model/model.weights.bin',
+        };
+        brain.load(modelInfo, brainLoaded); 
+    }
 }
 
 function brainLoaded() {
@@ -135,20 +147,22 @@ function gotPoses(poses) {
 }
 
 function keyPressed() {
-    if (key == 's') {
-       brain.saveData();
-    } else if (key == 'r') {
-        targetLabel = poseInput.value();
-        console.log(targetLabel);
-
-        setTimeout(function() {
-            console.log('collecting');
-            state = "collecting";
-            setTimeout(function() {
-            console.log('not collecting');
-            state = "waiting";
-            }, 10000);
-        }, 5000);
+    if (fileState == "dataCollection") {
+        if (key == 's') {
+            brain.saveData();
+         } else if (key == 'r') {
+             targetLabel = poseInput.value();
+             console.log(targetLabel);
+     
+             setTimeout(function() {
+                 console.log('collecting');
+                 state = "collecting";
+                 setTimeout(function() {
+                 console.log('not collecting');
+                 state = "waiting";
+                 }, 10000);
+             }, 5000);
+         }
     }
 }
 
