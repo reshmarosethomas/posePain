@@ -1,7 +1,7 @@
 let video; //stores webcam video
 let posenet; //initialize with ml5 object poseNet
 let brain; //initialize with ml5 object neuralNetwork
-let fileState = "modelTraining"; //"modelDeployed" "dataCollection" "modelTraining"
+let fileState = "modelDeployed"; //"modelDeployed" "dataCollection" "modelTraining"
 let table; //to store poseToAudio as csv
 let rows; //to store reference to poseToAudio csv rows
 
@@ -33,7 +33,7 @@ function setup() {
     poseInput.position(1*video.width, video.height*3);
     poseInput.size(400, 32);
 
-    //initializePosenet();
+    if (fileState != "modelTraining") {initializePosenet();}
     initializeBrain();
 }
 
@@ -69,9 +69,9 @@ function initializeBrain(){
         brain.loadData('24PoseData.json', dataReady);
     } else if (fileState == "modelDeployed") {
         const modelInfo = {
-            model: 'model/model.json',
-            metadata: 'model/model_meta.json',
-            weights: 'model/model.weights.bin',
+            model: 'model2/model.json',
+            metadata: 'model2/model_meta.json',
+            weights: 'model2/model.weights.bin',
         };
         brain.load(modelInfo, brainLoaded); 
     }
