@@ -15,6 +15,7 @@ let poseLabel = "unknown";
 let poseLabelScore = 0.0;
 
 let videoScaleVal = 1;
+let isBodyVisible = true;
 
 function preload() {
     table = loadTable("poseToAudio.csv", "csv", "header");
@@ -29,9 +30,11 @@ function setup() {
     video  = createCapture(VIDEO);
     video.hide();
 
-    poseInput = createInput('');
-    poseInput.position(1*video.width, video.height*3);
-    poseInput.size(400, 32);
+    if (fileState == "dataCollection") {
+        poseInput = createInput('');
+        poseInput.position(1*video.width, video.height*3);
+        poseInput.size(400, 32);
+    }
 
     if (fileState != "modelTraining") {initializePosenet();}
     initializeBrain();
@@ -83,7 +86,7 @@ function brainLoaded() {
 }
   
 function classifyPose() {
-    if (pose) {
+    if (pose && isBodyVisible) {
         if (pose.score > 0.75) {
             let inputs = [];
             for (let i = 0; i < pose.keypoints.length; i++) {
@@ -93,13 +96,13 @@ function classifyPose() {
               inputs.push(y);
             }
             brain.classify(inputs, gotResult);
-          } else {
-              poseLabel = "unsure pose";
-              poseLabelScore = 0.0;
-              setTimeout(classifyPose, 200);
-          }
+        } else {
+            poseLabel = "unclear";
+            poseLabelScore = 0.0;
+            setTimeout(classifyPose, 200);
+        }
     } else {
-        poseLabel = "no pose";
+        poseLabel = "noPose";
         poseLabelScore = 0.0;
         setTimeout(classifyPose, 200);
     }
@@ -107,7 +110,13 @@ function classifyPose() {
 }
   
 function gotResult(error, results) {
-    console.log(results);
+
+    if (error) {
+        console.log(error);
+        return;
+    }
+
+    //console.log(results);
 
     if (results[0].confidence > 0.8) {
         poseLabel = results[0].label;
@@ -136,8 +145,7 @@ function poseModelLoaded() {
 
 function gotPoses(poses) {
     //console.log(poses);
-    /*
-        poses = [
+    /* poses = [
             {
                 pose: {score: 0.40012150148664755, keypoints: Array(17), nose: {…}, leftEye: {…}, rightEye: {…}, …},
                 skeleton: []
@@ -187,16 +195,70 @@ function keyPressed() {
 
 function draw() {
     background("white");
+    drawVideo();
     
+    if (pose) {
+
+        isBodyVisible = true;
+
+        //Draw all the 17 keypoints on the body
+        for (let i = 0; i < pose.keypoints.length; i++) {
+            let xPos = pose.keypoints[i].position.x;
+            let yPos = pose.keypoints[i].position.y;
+            fill("white");
+            ellipse(xPos, yPos, 8, 8);
+            //console.log(xPos + " " + yPos);
+            if (xPos < 100 || xPos > 1000) isBodyVisible = false;
+            if (yPos < 50 || yPos > 670) isBodyVisible = false;
+        }
+
+        console.log("In Frame: " + isBodyVisible);
+
+        //Draw the skeleton that connects specific keypoints in the body
+        drawSkeleton();
+
+        push();
+        fill("#ca0020");
+            ellipse(pose.nose.x, pose.nose.y, 16, 16);
+            ellipse(pose.rightWrist.x, pose.rightWrist.y, 16, 16);
+            ellipse(pose.leftWrist.x, pose.leftWrist.y, 16, 16);
+        pop();
+
+        //console.log(pose.score);
+        drawGUIText()
+    }
+    
+}
+
+function drawVideo() {
     translate(video.width*videoScaleVal, 0);
     scale(-1*videoScaleVal, videoScaleVal); //scale(-2, 2); 
     image(video, 0, 0);
     filter(INVERT);
-    
-    if (pose) {
 
-        //console.log(pose.score);
+    push();
+    rectMode(CORNERS);
+    noFill(); stroke("red"); strokeWeight(4);
+    rect(0, 0, video.width*videoScaleVal, video.height*videoScaleVal);
+    pop();
+}
+
+function drawSkeleton() {
+    //Draw the skeleton that connects specific keypoints in the body
+    for (let i = 0; i < skeleton.length; i++) {
+        //skeleton is a 2D array for the two points that make a line of the skeleton
+        let a = skeleton[i][0];
+        let b = skeleton[i][1];
         push();
+        stroke("white");
+        strokeWeight(2);
+        line(a.position.x, a.position.y, b.position.x, b.position.y);
+        pop();
+    }
+}
+
+function drawGUIText() {
+    push();
         scale(-1, 1);
         textSize(48); 
         textStyle(BOLD);
@@ -205,33 +267,4 @@ function draw() {
         text(poseLabel, -1*video.width*videoScaleVal/2, video.height*videoScaleVal/2, video.width, video.height-10);
         text(poseLabelScore, -1*video.width*videoScaleVal/2, video.height*videoScaleVal/4, video.width, video.height-10);
         pop();
-
-        //Draw all the 17 keypoints on the body
-        for (let i = 0; i < pose.keypoints.length; i++) {
-            let xPos = pose.keypoints[i].position.x;
-            let yPos = pose.keypoints[i].position.y;
-            fill("white");
-            ellipse(xPos, yPos, 8, 8);
-        }
-
-        //Draw the skeleton that connects specific keypoints in the body
-        for (let i = 0; i < skeleton.length; i++) {
-            //skeleton is a 2D array for the two points that make a line of the skeleton
-            let a = skeleton[i][0];
-            let b = skeleton[i][1];
-            push();
-            stroke("white");
-            strokeWeight(2);
-            line(a.position.x, a.position.y, b.position.x, b.position.y);
-            pop();
-        }
-
-        push();
-        fill("#ca0020");
-        ellipse(pose.nose.x, pose.nose.y, 16);
-        rect(pose.rightWrist.x, pose.rightWrist.y, 16, 16);
-        rect(pose.leftWrist.x, pose.leftWrist.y, 16, 16);
-        pop();
-    }
-    
 }
