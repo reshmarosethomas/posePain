@@ -231,9 +231,7 @@ function draw() {
             if (yPos < 50 || yPos > 670) isBodyVisible = false;
         }
 
-        console.log("In Frame: " + isBodyVisible);
-
-        
+        //console.log("In Frame: " + isBodyVisible);
 
         push();
         fill("#ca0020");
