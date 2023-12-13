@@ -16,6 +16,8 @@ let poseLabelScore = 0.0;
 
 let videoScaleVal = 1;
 let isBodyVisible = true;
+let audioPlaying = false;
+let clips = [7];
 
 function preload() {
     table = loadTable("poseToAudio.csv", "csv", "header");
@@ -29,6 +31,16 @@ function setup() {
     rows = table.getRows();
     video  = createCapture(VIDEO);
     video.hide();
+
+    for (let r = 0; r < rows.length; r++) {
+        let clipInRow = rows[r].get('clipName');
+        let clipPath = "audioClips/" + clipInRow;
+        clips[r] = createAudio(clipPath, () => {
+            clips[r].autoplay(false);
+            clips[r].noLoop();
+            clips[r].hideControls();
+          });
+    }
 
     if (fileState == "dataCollection") {
         poseInput = createInput('');
@@ -86,27 +98,32 @@ function brainLoaded() {
 }
   
 function classifyPose() {
-    if (pose && isBodyVisible) {
-        if (pose.score > 0.75) {
-            let inputs = [];
-            for (let i = 0; i < pose.keypoints.length; i++) {
-              let x = pose.keypoints[i].position.x;
-              let y = pose.keypoints[i].position.y;
-              inputs.push(x);
-              inputs.push(y);
+    if (!audioPlaying) {
+        if (pose && isBodyVisible) {
+            if (pose.score > 0.75) {
+                let inputs = [];
+                for (let i = 0; i < pose.keypoints.length; i++) {
+                  let x = pose.keypoints[i].position.x;
+                  let y = pose.keypoints[i].position.y;
+                  inputs.push(x);
+                  inputs.push(y);
+                }
+                brain.classify(inputs, gotResult);
+            } else {
+                poseLabel = "unclear";
+                poseLabelScore = 0.0;
+                setTimeout(classifyPose, 200);
             }
-            brain.classify(inputs, gotResult);
         } else {
-            poseLabel = "unclear";
+            poseLabel = "noPose";
             poseLabelScore = 0.0;
             setTimeout(classifyPose, 200);
         }
     } else {
-        poseLabel = "noPose";
+        poseLabel = "paused";
         poseLabelScore = 0.0;
         setTimeout(classifyPose, 200);
     }
-    
 }
   
 function gotResult(error, results) {
@@ -117,6 +134,7 @@ function gotResult(error, results) {
     }
 
     //console.log(results);
+    //console.log(results[0].confidence);
 
     if (results[0].confidence > 0.8) {
         poseLabel = results[0].label;
@@ -125,7 +143,7 @@ function gotResult(error, results) {
         poseLabel = "unsure";
         poseLabelScore = results[0].confidence;
     }
-    //console.log(results[0].confidence);
+    
     setTimeout(classifyPose, 200);
 }
 
@@ -200,12 +218,13 @@ function draw() {
     if (pose) {
 
         isBodyVisible = true;
+        drawSkeleton();
 
         //Draw all the 17 keypoints on the body
         for (let i = 0; i < pose.keypoints.length; i++) {
             let xPos = pose.keypoints[i].position.x;
             let yPos = pose.keypoints[i].position.y;
-            fill("white");
+            fill("#2c7bb6");
             ellipse(xPos, yPos, 8, 8);
             //console.log(xPos + " " + yPos);
             if (xPos < 100 || xPos > 1000) isBodyVisible = false;
@@ -214,8 +233,7 @@ function draw() {
 
         console.log("In Frame: " + isBodyVisible);
 
-        //Draw the skeleton that connects specific keypoints in the body
-        drawSkeleton();
+        
 
         push();
         fill("#ca0020");
@@ -226,6 +244,25 @@ function draw() {
 
         //console.log(pose.score);
         drawGUIText()
+    }
+
+    if (poseLabel!="unsure" || poseLabel!="unclear" || poseLabel!="noPose" || poseLabel!="paused") {
+        for (let r = 0; r < rows.length; r++) {
+            let poseInRow = rows[r].get('poseLabel');
+            if (poseInRow == poseLabel) {
+                console.log (rows[r].get('clipName'));
+                let index = parseInt(rows[r].get('audioId'));
+                let clipDuration = clips[index].duration()*1000;
+                clips[index].play();
+                audioPlaying = true;
+                console.log(clipDuration);
+                setTimeout(function() { 
+                    audioPlaying = false; 
+                    console.log();
+                }, 
+                clipDuration);
+            }
+        }
     }
     
 }
@@ -250,7 +287,7 @@ function drawSkeleton() {
         let a = skeleton[i][0];
         let b = skeleton[i][1];
         push();
-        stroke("white");
+        stroke("black");
         strokeWeight(2);
         line(a.position.x, a.position.y, b.position.x, b.position.y);
         pop();
@@ -265,6 +302,6 @@ function drawGUIText() {
         textAlign(CENTER, CENTER);
         //text(pose.score, -1*video.width*videoScaleVal/2, video.height*videoScaleVal/2, video.width, video.height);
         text(poseLabel, -1*video.width*videoScaleVal/2, video.height*videoScaleVal/2, video.width, video.height-10);
-        text(poseLabelScore, -1*video.width*videoScaleVal/2, video.height*videoScaleVal/4, video.width, video.height-10);
-        pop();
+        text(poseLabelScore, -1*video.width*videoScaleVal/2, video.height*videoScaleVal/2.5, video.width, video.height-10);
+    pop();
 }
