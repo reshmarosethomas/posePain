@@ -1,7 +1,9 @@
 let video; //stores webcam video
 let posenet; //initialize with ml5 object poseNet
 let brain; //initialize with ml5 object neuralNetwork
-let fileState = "modelDeployed"; //"modelDeployed" "dataCollection" "modelTraining"
+let fileState = "modelTraining"; //"modelDeployed" "dataCollection" "modelTraining"
+let table; //to store poseToAudio as csv
+let rows; //to store reference to poseToAudio csv rows
 
 let pose; //regularly stores the first pose in poses
 let skeleton; //regularly stores the first skeleton in poses
@@ -14,11 +16,16 @@ let poseLabelScore = 0.0;
 
 let videoScaleVal = 1;
 
+function preload() {
+    table = loadTable("poseToAudio.csv", "csv", "header");
+}
+
 function setup() {
     createCanvas(windowWidth, windowWidth);
     noStroke();
     rectMode(CENTER);
 
+    rows = table.getRows();
     video  = createCapture(VIDEO);
     video.hide();
 
@@ -26,7 +33,7 @@ function setup() {
     poseInput.position(1*video.width, video.height*3);
     poseInput.size(400, 32);
 
-    initializePosenet();
+    //initializePosenet();
     initializeBrain();
 }
 
@@ -76,35 +83,46 @@ function brainLoaded() {
 }
   
 function classifyPose() {
-    if (pose && pose.score > 0.75) {
-      let inputs = [];
-      for (let i = 0; i < pose.keypoints.length; i++) {
-        let x = pose.keypoints[i].position.x;
-        let y = pose.keypoints[i].position.y;
-        inputs.push(x);
-        inputs.push(y);
-      }
-      brain.classify(inputs, gotResult);
+    if (pose) {
+        if (pose.score > 0.75) {
+            let inputs = [];
+            for (let i = 0; i < pose.keypoints.length; i++) {
+              let x = pose.keypoints[i].position.x;
+              let y = pose.keypoints[i].position.y;
+              inputs.push(x);
+              inputs.push(y);
+            }
+            brain.classify(inputs, gotResult);
+          } else {
+              poseLabel = "unsure pose";
+              poseLabelScore = 0.0;
+              setTimeout(classifyPose, 200);
+          }
     } else {
-      setTimeout(classifyPose, 200);
+        poseLabel = "no pose";
+        poseLabelScore = 0.0;
+        setTimeout(classifyPose, 200);
     }
+    
 }
   
 function gotResult(error, results) {
+    console.log(results);
+
     if (results[0].confidence > 0.8) {
-      poseLabel = results[0].label;
-      poseLabelScore = results[0].confidence;
+        poseLabel = results[0].label;
+        poseLabelScore = results[0].confidence;
     } else if (results[0].confidence <= 0.8) {
         poseLabel = "unsure";
-      poseLabelScore = results[0].confidence;
+        poseLabelScore = results[0].confidence;
     }
     //console.log(results[0].confidence);
-    classifyPose();
+    setTimeout(classifyPose, 200);
 }
 
 function dataReady() {
     brain.normalizeData();
-    brain.train({epochs: 80}, trainingFinished); 
+    brain.train({epochs: 200}, trainingFinished); 
 }
   
 function trainingFinished() {
@@ -209,13 +227,7 @@ function draw() {
         }
 
         push();
-        // if (pose.nose.x - pose.rightWrist.x < 100) {
-        //     fill("red");
-        // } else {
-        //     fill("green");
-        // }
         fill("#ca0020");
-
         ellipse(pose.nose.x, pose.nose.y, 16);
         rect(pose.rightWrist.x, pose.rightWrist.y, 16, 16);
         rect(pose.leftWrist.x, pose.leftWrist.y, 16, 16);
